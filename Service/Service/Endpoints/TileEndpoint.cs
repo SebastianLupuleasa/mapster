@@ -47,8 +47,9 @@ internal class TileEndpoint : IDisposable
                     new Coordinate(maxLat, maxLon)
                 ),
                 featureData =>
-                {
+                {        
                     featureData.Tessellate(ref pixelBb, ref shapes);
+
                     return true;
                 }
             );

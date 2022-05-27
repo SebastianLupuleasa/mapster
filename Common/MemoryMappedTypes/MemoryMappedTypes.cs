@@ -116,12 +116,7 @@ public struct PropertyEntryList
 [StructLayout(LayoutKind.Explicit, Pack = 1)]
 public struct MapFeature
 {
-    // https://wiki.openstreetmap.org/wiki/Key:highway
-    public static string[] HighwayTypes =
-    {
-        "motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "road"
-    };
-
+    
     [FieldOffset(0)] public long Id;
     [FieldOffset(8)] public int LabelOffset;
     [FieldOffset(12)] public GeometryType GeometryType;

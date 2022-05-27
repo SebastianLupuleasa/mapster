@@ -70,6 +70,7 @@ public static class Program
     {
         var usedNodes = new HashSet<long>();
 
+        long featureIdCounter = -1;
         var featureIds = new List<long>();
         // var geometryTypes = new List<GeometryType>();
         // var coordinates = new List<(long id, (int offset, List<Coordinate> coordinates) values)>();
@@ -94,8 +95,10 @@ public static class Program
 
         foreach (var (tileId, _) in mapData.Tiles)
         {
+            // FIXME: Not thread safe
             usedNodes.Clear();
 
+            // FIXME: Not thread safe
             featureIds.Clear();
             labels.Clear();
 
@@ -106,15 +109,16 @@ public static class Program
 
             foreach (var way in mapData.Ways)
             {
+                var featureId = Interlocked.Increment(ref featureIdCounter);
+
                 var featureData = new FeatureData
                 {
-                    Id = way.Id,
+                    Id = featureId,
                     Coordinates = (totalCoordinateCount, new List<Coordinate>()),
                     PropertyKeys = (totalPropertyCount, new List<string>(way.Tags.Count)),
                     PropertyValues = (totalPropertyCount, new List<string>(way.Tags.Count))
                 };
 
-                featureIds.Add(way.Id);
                 var geometryType = GeometryType.Polyline;
 
                 labels.Add(-1);
@@ -131,6 +135,11 @@ public static class Program
                 foreach (var nodeId in way.NodeIds)
                 {
                     var node = mapData.Nodes[nodeId];
+                    if (TiligSystem.GetTile(new Coordinate(node.Latitude, node.Longitude)) != tileId)
+                    {
+                        continue;
+                    }
+
                     usedNodes.Add(nodeId);
 
                     foreach (var (key, value) in node.Tags)
@@ -143,6 +152,14 @@ public static class Program
                     }
 
                     featureData.Coordinates.coordinates.Add(new Coordinate(node.Latitude, node.Longitude));
+                }
+
+                // This feature is not located within this tile, skip it
+                if (featureData.Coordinates.coordinates.Count == 0)
+                {
+                    // Remove the last item since we added it preemptively
+                    labels.RemoveAt(labels.Count - 1);
+                    continue;
                 }
 
                 if (featureData.Coordinates.coordinates[0] == featureData.Coordinates.coordinates[^1])
@@ -159,12 +176,18 @@ public static class Program
                     throw new InvalidDataContractException("Property keys and values should have the same count");
                 }
 
-                featuresData.Add(way.Id, featureData);
+                featureIds.Add(featureId);
+                featuresData.Add(featureId, featureData);
             }
 
             foreach (var (nodeId, node) in mapData.Nodes.Where(n => !usedNodes.Contains(n.Key)))
             {
-                featureIds.Add(nodeId);
+                if (TiligSystem.GetTile(new Coordinate(node.Latitude, node.Longitude)) != tileId)
+                {
+                    continue;
+                }
+
+                var featureId = Interlocked.Increment(ref featureIdCounter);
 
                 var featurePropKeys = new List<string>();
                 var featurePropValues = new List<string>();
@@ -187,9 +210,9 @@ public static class Program
                     throw new InvalidDataContractException("Property keys and values should have the same count");
                 }
 
-                featuresData.Add(nodeId, new FeatureData
+                var fData = new FeatureData
                 {
-                    Id = nodeId,
+                    Id = featureId,
                     GeometryType = (byte)GeometryType.Point,
                     Coordinates = (totalCoordinateCount, new List<Coordinate>
                     {
@@ -197,7 +220,9 @@ public static class Program
                     }),
                     PropertyKeys = (totalPropertyCount, featurePropKeys),
                     PropertyValues = (totalPropertyCount, featurePropValues)
-                });
+                };
+                featuresData.Add(featureId, fData);
+                featureIds.Add(featureId);
 
                 totalPropertyCount += featurePropKeys.Count;
                 ++totalCoordinateCount;
@@ -243,11 +268,11 @@ public static class Program
             // Record the current position in the stream
             var currentPosition = fileWriter.BaseStream.Position;
             // Seek back in the file to the position of the field
-            fileWriter.Seek((int)coPosition, SeekOrigin.Begin);
+            fileWriter.BaseStream.Position = coPosition;
             // Write the recorded 'currentPosition'
             fileWriter.Write(currentPosition); // TileBlockHeader: CoordinatesOffsetInBytes
             // And seek forward to continue updating the file
-            fileWriter.Seek((int)currentPosition, SeekOrigin.Begin);
+            fileWriter.BaseStream.Position = currentPosition;
             foreach (var t in featureIds)
             {
                 var featureData = featuresData[t];
@@ -262,11 +287,11 @@ public static class Program
             // Record the current position in the stream
             currentPosition = fileWriter.BaseStream.Position;
             // Seek back in the file to the position of the field
-            fileWriter.Seek((int)soPosition, SeekOrigin.Begin);
+            fileWriter.BaseStream.Position = soPosition;
             // Write the recorded 'currentPosition'
             fileWriter.Write(currentPosition); // TileBlockHeader: StringsOffsetInBytes
             // And seek forward to continue updating the file
-            fileWriter.Seek((int)currentPosition, SeekOrigin.Begin);
+            fileWriter.BaseStream.Position = currentPosition;
 
             var stringOffset = 0;
             foreach (var t in featureIds)
@@ -290,11 +315,11 @@ public static class Program
             // Record the current position in the stream
             currentPosition = fileWriter.BaseStream.Position;
             // Seek back in the file to the position of the field
-            fileWriter.Seek((int)choPosition, SeekOrigin.Begin);
+            fileWriter.BaseStream.Position = choPosition;
             // Write the recorded 'currentPosition'
             fileWriter.Write(currentPosition); // TileBlockHeader: CharactersOffsetInBytes
             // And seek forward to continue updating the file
-            fileWriter.Seek((int)currentPosition, SeekOrigin.Begin);
+            fileWriter.BaseStream.Position = currentPosition;
             foreach (var t in featureIds)
             {
                 var featureData = featuresData[t];

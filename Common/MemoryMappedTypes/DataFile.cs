@@ -182,25 +182,28 @@ public unsafe class DataFile : IDisposable
                 if (isFeatureInBBox)
                 {
                     var properties = new Dictionary<string, string>(feature->PropertyCount);
+                  
                     for (var p = 0; p < feature->PropertyCount; ++p)
                     {
                         GetProperty(header.Tile.Value.StringsOffsetInBytes, header.Tile.Value.CharactersOffsetInBytes, p * 2 + feature->PropertiesOffset, out var key, out var value);
+                        
                         properties.Add(key.ToString(), value.ToString());
                     }
-
+                   
                     if (!action(new MapFeatureData
-                        {
-                            Id = feature->Id,
-                            Label = label,
-                            Coordinates = coordinates,
-                            Type = feature->GeometryType,
-                            Properties = properties
-                        }))
+                    {
+                        Id = feature->Id,
+                        Label = label,
+                        Coordinates = coordinates,
+                        Type = feature->GeometryType,
+                        Properties = properties,
+                    }))
                     {
                         break;
-                    }
+                    } 
                 }
             }
         }
     }
+
 }

@@ -215,25 +215,6 @@ public struct PopulatedPlace : BaseShape
             ShouldRender = true;
         }
     }
-
-    public static bool ShouldBePopulatedPlace(MapFeatureData feature)
-    {
-        // https://wiki.openstreetmap.org/wiki/Key:place
-        if (feature.Type != GeometryType.Point)
-        {
-            return false;
-        }
-        foreach (var entry in feature.Properties)
-            if (entry.Key.StartsWith("place"))
-            {
-                if (entry.Value.StartsWith("city") || entry.Value.StartsWith("town") ||
-                    entry.Value.StartsWith("locality") || entry.Value.StartsWith("hamlet"))
-                {
-                    return true;
-                }
-            }
-        return false;
-    }
 }
 
 public struct Border : BaseShape
@@ -255,30 +236,6 @@ public struct Border : BaseShape
         for (var i = 0; i < c.Length; i++)
             ScreenCoordinates[i] = new PointF((float)MercatorProjection.lonToX(c[i].Longitude),
                 (float)MercatorProjection.latToY(c[i].Latitude));
-    }
-
-    public static bool ShouldBeBorder(MapFeatureData feature)
-    {
-        // https://wiki.openstreetmap.org/wiki/Key:admin_level
-        var foundBoundary = false;
-        var foundLevel = false;
-        foreach (var entry in feature.Properties)
-        {
-            if (entry.Key.StartsWith("boundary") && entry.Value.StartsWith("administrative"))
-            {
-                foundBoundary = true;
-            }
-            if (entry.Key.StartsWith("admin_level") && entry.Value == "2")
-            {
-                foundLevel = true;
-            }
-            if (foundBoundary && foundLevel)
-            {
-                break;
-            }
-        }
-
-        return foundBoundary && foundLevel;
     }
 }
 
